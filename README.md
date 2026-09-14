@@ -55,14 +55,22 @@ cidadão).
 
 ## 3. Configurar o provedor de mapas (opcional)
 
-Por padrão o mapa usa o estilo vetorial gratuito da
-[OpenFreeMap](https://openfreemap.org) (dados OpenStreetMap), que **não
-exige chave de API**. Isso já é suficiente para rodar e demonstrar o
-protótipo.
+Por padrão o mapa usa **tiles raster do OpenStreetMap**, sem exigir chave
+de API. Essa é uma escolha deliberada de robustez: um estilo vetorial de
+terceiros (Mapbox, OpenFreeMap etc.) depende de várias requisições
+encadeadas (style.json + sprites + glyphs + dezenas de tiles `.pbf`) — se
+qualquer uma falhar numa rede restrita (Wi-Fi de evento, proxy
+corporativo), o mapa inteiro não aparece. Tiles raster são simples
+requisições de imagem servidas por um dos hosts mais universalmente
+acessíveis que existem, o que torna o protótipo muito mais resistente no
+dia da apresentação. Se os tiles não carregarem mesmo assim, a interface
+mostra um aviso com botão "Tentar novamente" em vez de ficar em branco
+silenciosamente — controles, marcadores e rota continuam funcionando por
+cima do mapa mesmo sem os tiles visuais.
 
-Para usar outro provedor (Mapbox, MapTiler, Google Maps Platform via um
-estilo compatível, etc.), crie um arquivo `.env.local` (nunca commitado) na
-raiz do projeto:
+Para usar um estilo vetorial mais bonito (Mapbox, MapTiler, Google Maps
+Platform via um estilo compatível, um estilo próprio), crie um arquivo
+`.env.local` (nunca commitado) na raiz do projeto:
 
 ```bash
 # .env.local

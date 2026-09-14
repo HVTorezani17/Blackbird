@@ -1,18 +1,49 @@
-// Configuração do provedor de mapas. Por padrão usamos o estilo vetorial
-// gratuito da OpenFreeMap (dados OpenStreetMap, sem necessidade de chave de
-// API), o que deixa o protótipo pronto para rodar imediatamente após
-// `npm install && npm run dev`.
+import type { StyleSpecification } from "maplibre-gl";
+
+// Configuração do provedor de mapas.
 //
-// Para trocar de provedor (ex.: Mapbox, MapTiler, Google Maps Platform),
-// defina a variável de ambiente NEXT_PUBLIC_MAP_STYLE_URL em um arquivo
-// `.env.local` (nunca commitado) apontando para a URL de estilo do seu
-// provedor, já incluindo a chave. Veja README.md → "Configurar provedor de
-// mapas" para exemplos.
+// Por padrão usamos tiles RASTER do OpenStreetMap (sem necessidade de chave
+// de API), construindo o "estilo" localmente (OSM_RASTER_STYLE) em vez de
+// buscar um style.json de terceiros. Isso é proposital: um estilo vetorial
+// (ex.: OpenFreeMap) depende de várias requisições encadeadas (style.json +
+// sprites + glyphs + dezenas de tiles vetoriais .pbf) e, se qualquer uma
+// falhar — rede restrita, proxy corporativo, CDN fora do ar — o mapa inteiro
+// não aparece. Tiles raster são apenas requisições de imagem simples,
+// servidas por um dos hosts mais universalmente acessíveis que existem, o
+// que torna o protótipo muito mais resistente em redes desconhecidas (como
+// a do local da apresentação).
+//
+// Para usar um estilo vetorial mais bonito (Mapbox, MapTiler, um estilo
+// próprio), defina a variável de ambiente NEXT_PUBLIC_MAP_STYLE_URL em um
+// arquivo `.env.local` (nunca commitado) apontando para a URL do estilo,
+// já incluindo a chave. Veja README.md → "Configurar provedor de mapas".
 
-export const DEFAULT_MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
+export const OSM_RASTER_STYLE: StyleSpecification = {
+  version: 8,
+  sources: {
+    "osm-raster": {
+      type: "raster",
+      tiles: [
+        "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        "https://b.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        "https://c.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      ],
+      tileSize: 256,
+      attribution: "© OpenStreetMap contributors",
+      maxzoom: 19,
+    },
+  },
+  layers: [
+    {
+      id: "osm-raster-layer",
+      type: "raster",
+      source: "osm-raster",
+    },
+  ],
+};
 
-export function getMapStyleUrl(): string {
-  return process.env.NEXT_PUBLIC_MAP_STYLE_URL || DEFAULT_MAP_STYLE_URL;
+export function getMapStyle(): string | StyleSpecification {
+  return process.env.NEXT_PUBLIC_MAP_STYLE_URL || OSM_RASTER_STYLE;
 }
 
 // Centro padrão do mapa: Vila Velha, ES (dado geográfico real).
