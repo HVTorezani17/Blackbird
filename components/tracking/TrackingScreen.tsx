@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { LngLatBounds } from "maplibre-gl";
-import type { MapLibreEvent } from "maplibre-gl";
 import {
   getRouteById,
   getPointById,
@@ -68,56 +67,26 @@ function InitialFit({
   return null;
 }
 
-function CameraFollow({
-  truckPosition,
-  following,
-}: {
-  truckPosition: { lat: number; lng: number } | null;
-  following: boolean;
-}) {
-  const { map } = useMap();
-  useEffect(() => {
-    if (!map || !following || !truckPosition) return;
-    map.easeTo({ center: [truckPosition.lng, truckPosition.lat], duration: 450 });
-  }, [map, following, truckPosition]);
-  return null;
-}
-
-function UserInteractionWatcher({ onUserInteract }: { onUserInteract: () => void }) {
-  const { map } = useMap();
-  useEffect(() => {
-    if (!map) return;
-    const handler = (e: MapLibreEvent) => {
-      if ((e as MapLibreEvent & { originalEvent?: unknown }).originalEvent) onUserInteract();
-    };
-    map.on("dragstart", handler);
-    map.on("zoomstart", handler);
-    return () => {
-      map.off("dragstart", handler);
-      map.off("zoomstart", handler);
-    };
-  }, [map, onUserInteract]);
-  return null;
-}
-
+/**
+ * Botões de câmera do mapa. O mapa é sempre livremente navegável (pan/zoom
+ * manual do usuário) — nunca ficamos re-centralizando automaticamente no
+ * caminhão a cada atualização de posição, pois isso trava a interação
+ * (cada `easeTo` cancelaria o gesto do usuário em andamento). "Centralizar
+ * no caminhão" é uma ação pontual (um único `flyTo`), não um modo
+ * persistente de "seguir".
+ */
 function ControlsBridge({
   truckPosition,
   userPosition,
-  following,
-  setFollowing,
 }: {
   truckPosition: { lat: number; lng: number } | null;
   userPosition: { lat: number; lng: number } | null;
-  following: boolean;
-  setFollowing: (v: boolean) => void;
 }) {
   const { map } = useMap();
   return (
     <TrackingMapControls
-      following={following}
       hasUserLocation={Boolean(userPosition)}
       onCenterTruck={() => {
-        setFollowing(true);
         if (map && truckPosition) {
           map.flyTo({
             center: [truckPosition.lng, truckPosition.lat],
@@ -156,8 +125,6 @@ export function TrackingScreen({ truckId, pointId }: { truckId: string | null; p
   const isFavorite = useFavoritesStore((s) => (point ? s.isFavorite("ponto", point.id) : false));
   const toggleFavorite = useFavoritesStore((s) => s.toggleFavorite);
   const pushNotification = useNotificationsStore((s) => s.push);
-
-  const [following, setFollowing] = useState(true);
 
   useEffect(() => {
     requestLocation();
@@ -210,9 +177,6 @@ export function TrackingScreen({ truckId, pointId }: { truckId: string | null; p
           pointPosition={point?.location ?? null}
           userPosition={userPosition}
         />
-        <CameraFollow truckPosition={truckState?.position ?? null} following={following} />
-        <UserInteractionWatcher onUserInteract={() => setFollowing(false)} />
-
         <RouteLayer traveled={split?.traveled} remaining={split?.remaining} />
         <CollectionPointMarkers points={routePoints} selectedPointId={pointId ?? undefined} onSelect={openPoint} />
         <UserLocationMarker position={userPosition} />
@@ -226,8 +190,6 @@ export function TrackingScreen({ truckId, pointId }: { truckId: string | null; p
         <ControlsBridge
           truckPosition={truckState?.position ?? null}
           userPosition={userPosition}
-          following={following}
-          setFollowing={setFollowing}
         />
       </MapProvider>
 

@@ -1,26 +1,37 @@
 "use client";
 
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { collectionPoints } from "@/lib/mock";
 import { distanceMeters } from "@/lib/geo/measure";
 import { useUserLocation } from "@/lib/geolocation/useUserLocation";
+import { usePointSheet } from "@/lib/navigation/usePointSheet";
+import { MapProvider } from "@/components/map/MapProvider";
+import { UserLocationMarker } from "@/components/map/UserLocationMarker";
+import { CollectionPointMarkers } from "@/components/map/CollectionPointMarkers";
 import { HomeHeader } from "@/components/home/HomeHeader";
+import { HomeSummaryBar } from "@/components/home/HomeSummaryBar";
+import { FitHome } from "@/components/home/FitHome";
 import { NextCollectionCard } from "@/components/home/NextCollectionCard";
-import { HomeMapPreview } from "@/components/home/HomeMapPreview";
 import { QuickActionsGrid } from "@/components/home/QuickActionsGrid";
 import { OnboardingOverlay } from "@/components/onboarding/OnboardingOverlay";
+import { Sheet } from "@/components/ui/Sheet";
 
 const ONBOARDING_KEY = "vv-onboarded-v1";
 
-function hasSeenOnboarding(): boolean {
-  if (typeof window === "undefined") return true;
-  return Boolean(window.localStorage.getItem(ONBOARDING_KEY));
-}
-
-export default function HomePage() {
+function HomeContent() {
   const { position, requestLocation } = useUserLocation();
-  const [onboarded, setOnboarded] = useState(hasSeenOnboarding);
+  const { openPoint, selectedPointId } = usePointSheet();
+  // Começa como "true" (sem overlay) para bater com a renderização do
+  // servidor, que não tem acesso ao localStorage — corrigido logo após a
+  // montagem no client, evitando erro de hydration mismatch.
+  const [onboarded, setOnboarded] = useState(true);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- leitura de localStorage só existe no client; precisa rodar após a montagem para não divergir da renderização do servidor.
+    setOnboarded(Boolean(window.localStorage.getItem(ONBOARDING_KEY)));
+  }, []);
 
   function finishOnboarding() {
     window.localStorage.setItem(ONBOARDING_KEY, "1");
@@ -35,18 +46,33 @@ export default function HomePage() {
   }, [position]);
 
   return (
-    <div className="relative flex h-full flex-col">
-      <div className="h-full overflow-y-auto vv-scrollbar-none">
-        <HomeHeader />
-        <div className="flex flex-col gap-5 px-4 pb-8 pt-3">
+    <div className="relative h-full w-full">
+      {/* A tela inicial é o mapa em tela cheia, focado na localização do
+          usuário assim que disponível — os pontos de coleta próximos
+          aparecem imediatamente, sem precisar navegar para outra tela. */}
+      <MapProvider className="absolute inset-0 h-full w-full">
+        <FitHome userPosition={position} points={collectionPoints} />
+        <UserLocationMarker position={position} />
+        <CollectionPointMarkers
+          points={collectionPoints}
+          selectedPointId={selectedPointId ?? undefined}
+          onSelect={openPoint}
+        />
+      </MapProvider>
+
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 bg-gradient-to-b from-[var(--color-bg)] via-[var(--color-bg)]/90 to-transparent pb-6">
+        <div className="pointer-events-auto">
+          <HomeHeader />
+        </div>
+      </div>
+
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 p-4">
+        <HomeSummaryBar point={nearestPoint} onExpand={() => setDetailsOpen(true)} />
+      </div>
+
+      <Sheet open={detailsOpen} onClose={() => setDetailsOpen(false)} title="Minha coleta">
+        <div className="flex flex-col gap-5">
           <NextCollectionCard point={nearestPoint} />
-          <Suspense fallback={<div className="h-48 animate-pulse rounded-2xl bg-[var(--color-surface-muted)]" />}>
-            <HomeMapPreview
-              userPosition={position}
-              points={collectionPoints}
-              highlightedPointId={nearestPoint.id}
-            />
-          </Suspense>
           <QuickActionsGrid />
           <p className="px-1 text-center text-[10.5px] leading-relaxed text-[var(--color-text-muted)]">
             Protótipo para demonstração — pontos, rotas e caminhões são dados simulados. Horários e
@@ -57,7 +83,7 @@ export default function HomePage() {
             .
           </p>
         </div>
-      </div>
+      </Sheet>
 
       {!onboarded && (
         <OnboardingOverlay
@@ -69,5 +95,13 @@ export default function HomePage() {
         />
       )}
     </div>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <Suspense fallback={null}>
+      <HomeContent />
+    </Suspense>
   );
 }
