@@ -10,7 +10,12 @@ import {
   ReactNode,
 } from "react";
 import { RefreshCw, WifiOff } from "lucide-react";
-import { getMapStyle, VILA_VELHA_CENTER, VILA_VELHA_DEFAULT_ZOOM } from "@/lib/mapConfig";
+import {
+  getPrimaryMapStyle,
+  getFallbackMapStyle,
+  VILA_VELHA_CENTER,
+  VILA_VELHA_DEFAULT_ZOOM,
+} from "@/lib/mapConfig";
 
 interface MapContextValue {
   map: MaplibreMap | null;
@@ -32,7 +37,9 @@ interface MapProviderProps {
   hideNativeControls?: boolean;
 }
 
-const TILE_TIMEOUT_MS = 8000;
+const TILE_TIMEOUT_MS = 7000;
+
+type StyleAttempt = "primary" | "fallback";
 
 export function MapProvider({
   children,
@@ -47,10 +54,14 @@ export function MapProvider({
   const [mapInstance, setMapInstance] = useState<MaplibreMap | null>(null);
   const [tileIssue, setTileIssue] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
+  // Tenta primeiro o estilo vetorial (mais bonito); se os tiles não
+  // carregarem a tempo, troca automaticamente para o raster de fallback
+  // sem exigir nenhuma ação do usuário. Só mostra o aviso manual se o
+  // fallback também falhar.
+  const [styleAttempt, setStyleAttempt] = useState<StyleAttempt>("primary");
 
   useEffect(() => {
     if (!containerRef.current) return;
-    // Suporta remontar o mapa ao clicar em "Tentar novamente".
     if (mapRef.current) {
       mapRef.current.remove();
       mapRef.current = null;
@@ -60,9 +71,11 @@ export function MapProvider({
     setMapInstance(null);
     setTileIssue(false);
 
+    const style = styleAttempt === "primary" ? getPrimaryMapStyle() : getFallbackMapStyle();
+
     const map = new MaplibreMap({
       container: containerRef.current,
-      style: getMapStyle(),
+      style,
       center,
       zoom,
       attributionControl: { compact: true },
@@ -80,17 +93,21 @@ export function MapProvider({
       setTileIssue(false);
     });
 
-    // Se o estilo/tiles falharem (ex.: rede restrita no momento), a UI não
-    // deve travar: controles e marcadores continuam funcionando sobre um
-    // mapa "em branco" — mas avisamos visivelmente em vez de deixar o mapa
-    // silenciosamente vazio, para que o problema seja identificável durante
-    // uma demonstração.
+    // Se o estilo/tiles falharem (ex.: rede restrita, provedor exigindo
+    // chave), a UI não deve travar: controles e marcadores continuam
+    // funcionando sobre um mapa "em branco" — e avisamos visivelmente em
+    // vez de deixar o mapa silenciosamente vazio.
     map.on("error", (e) => {
       console.warn("[MapProvider] Erro ao carregar recurso do mapa:", e?.error?.message ?? e);
     });
 
     const timeout = setTimeout(() => {
-      if (!didLoad) setTileIssue(true);
+      if (didLoad) return;
+      if (styleAttempt === "primary") {
+        setStyleAttempt("fallback");
+      } else {
+        setTileIssue(true);
+      }
     }, TILE_TIMEOUT_MS);
 
     mapRef.current = map;
@@ -102,7 +119,7 @@ export function MapProvider({
       mapRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [retryKey]);
+  }, [retryKey, styleAttempt]);
 
   return (
     <div ref={containerRef} className={`relative ${className ?? ""}`}>
@@ -121,7 +138,10 @@ export function MapProvider({
               Verifique a conexão com a internet. Marcadores e rota continuam funcionando.
             </p>
             <button
-              onClick={() => setRetryKey((k) => k + 1)}
+              onClick={() => {
+                setStyleAttempt("primary");
+                setRetryKey((k) => k + 1);
+              }}
               className="mt-1 flex items-center gap-1.5 rounded-full bg-[var(--color-brand)] px-3 py-1.5 text-[11px] font-medium text-white"
             >
               <RefreshCw size={12} /> Tentar novamente

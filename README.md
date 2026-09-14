@@ -55,25 +55,25 @@ cidadão).
 
 ## 3. Configurar o provedor de mapas (opcional)
 
-Por padrão o mapa usa **tiles raster da CARTO** (`basemaps.cartocdn.com`),
-sem exigir chave de API. Dois motivos para essa escolha:
+Por padrão o mapa tenta, nesta ordem, sem exigir nenhuma chave de API:
 
-- MapLibre GL renderiza tiles como texturas WebGL, o que exige que o
-  servidor responda com cabeçalhos CORS. Os tiles "clássicos" do
-  OpenStreetMap (`tile.openstreetmap.org`), pensados para uso com `<img>`
-  em bibliotecas como Leaflet, **não** enviam esses cabeçalhos de forma
-  confiável — usá-los resulta em mapa em branco mesmo com internet
-  funcionando normalmente. Os tiles da CARTO são publicados
-  explicitamente para uso embarcado em bibliotecas como esta.
-- São tiles raster simples (só requisições de imagem), em vez de um
-  estilo vetorial completo (style.json + sprites + glyphs + tiles
-  `.pbf`), o que reduz os pontos de falha numa rede mais restrita (Wi-Fi
-  de evento, proxy corporativo).
+1. **Estilo vetorial OpenFreeMap** (`tiles.openfreemap.org`) — feito
+   especificamente para uso com MapLibre GL (cabeçalhos CORS corretos),
+   visual mais completo.
+2. Se os tiles não terminarem de carregar em alguns segundos (rede
+   restrita, provedor fora do ar), o app troca **automaticamente**, sem
+   nenhuma ação do usuário, para um estilo raster de **fallback (Esri
+   World Street Map)**, mais simples e com menos pontos de falha.
+3. Se mesmo o fallback falhar, a interface mostra um aviso com botão
+   "Tentar novamente" em vez de ficar em branco silenciosamente —
+   controles, marcadores e rota continuam funcionando por cima do mapa
+   mesmo sem os tiles visuais.
 
-Se os tiles não carregarem mesmo assim, a interface mostra um aviso com
-botão "Tentar novamente" em vez de ficar em branco silenciosamente —
-controles, marcadores e rota continuam funcionando por cima do mapa mesmo
-sem os tiles visuais.
+Essa cadeia existe porque, na prática, provedores gratuitos de tiles têm
+comportamentos diferentes e às vezes mudam de política sem aviso (ex.:
+tiles "clássicos" do OpenStreetMap não têm CORS habilitado para uso com
+WebGL, e alguns provedores raster legados passaram a exigir chave). Ver
+`lib/mapConfig.ts` para o racional completo de cada opção testada.
 
 Para usar um estilo vetorial mais bonito (Mapbox, MapTiler, Google Maps
 Platform via um estilo compatível, um estilo próprio), crie um arquivo

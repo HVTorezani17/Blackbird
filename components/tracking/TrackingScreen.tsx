@@ -12,8 +12,10 @@ import {
   useTruckState,
   useTraveledRemaining,
   useEtaToPoint,
+  useRouteGeometryFor,
   useSimulationReady,
 } from "@/lib/simulation/selectors";
+import { GeoPoint } from "@/lib/types";
 import { useUserLocation } from "@/lib/geolocation/useUserLocation";
 import { useFavoritesStore } from "@/lib/store/useFavoritesStore";
 import { useNotificationsStore } from "@/lib/store/useNotificationsStore";
@@ -32,37 +34,41 @@ function InitialFit({
   truckPosition,
   pointPosition,
   userPosition,
+  routePoints,
 }: {
   truckPosition: { lat: number; lng: number } | null;
   pointPosition: { lat: number; lng: number } | null;
   userPosition: { lat: number; lng: number } | null;
+  /** Geometria completa da rota — inclusa no enquadramento para que a
+   *  rota inteira fique visível de cara, mesmo que o caminho real (por
+   *  ruas) entre caminhão/ponto/usuário dê uma volta maior do que a
+   *  distância em linha reta entre eles sugeriria. */
+  routePoints: GeoPoint[];
 }) {
   const { map } = useMap();
   const done = useRef(false);
 
   useEffect(() => {
-    if (!map || done.current) return;
-    const coords: [number, number][] = [];
+    // Só roda quando já temos a geometria da rota (ou não há uma
+    // disponível), para não enquadrar cedo demais num pedaço parcial.
+    if (!map || done.current || routePoints.length === 0) return;
+
+    const coords: [number, number][] = routePoints.map((p) => [p.lng, p.lat]);
     if (truckPosition) coords.push([truckPosition.lng, truckPosition.lat]);
     if (pointPosition) coords.push([pointPosition.lng, pointPosition.lat]);
     if (userPosition) coords.push([userPosition.lng, userPosition.lat]);
-    if (coords.length === 0) return;
 
-    if (coords.length === 1) {
-      map.jumpTo({ center: coords[0], zoom: 15.5 });
-    } else {
-      const bounds = coords.reduce(
-        (b, c) => b.extend(c),
-        new LngLatBounds(coords[0], coords[0]),
-      );
-      map.fitBounds(bounds, {
-        padding: { top: 120, bottom: 240, left: 56, right: 56 },
-        maxZoom: 16,
-        duration: 0,
-      });
-    }
+    const bounds = coords.reduce(
+      (b, c) => b.extend(c),
+      new LngLatBounds(coords[0], coords[0]),
+    );
+    map.fitBounds(bounds, {
+      padding: { top: 120, bottom: 240, left: 40, right: 40 },
+      maxZoom: 16,
+      duration: 0,
+    });
     done.current = true;
-  }, [map, truckPosition, pointPosition, userPosition]);
+  }, [map, truckPosition, pointPosition, userPosition, routePoints]);
 
   return null;
 }
@@ -121,6 +127,7 @@ export function TrackingScreen({ truckId, pointId }: { truckId: string | null; p
   const truckState = useTruckState(truckId);
   const split = useTraveledRemaining(truckId);
   const eta = useEtaToPoint(truckId, pointId);
+  const geometry = useRouteGeometryFor(truck?.routeId);
 
   const isFavorite = useFavoritesStore((s) => (point ? s.isFavorite("ponto", point.id) : false));
   const toggleFavorite = useFavoritesStore((s) => s.toggleFavorite);
@@ -176,6 +183,7 @@ export function TrackingScreen({ truckId, pointId }: { truckId: string | null; p
           truckPosition={truckState?.position ?? null}
           pointPosition={point?.location ?? null}
           userPosition={userPosition}
+          routePoints={geometry?.points ?? []}
         />
         <RouteLayer traveled={split?.traveled} remaining={split?.remaining} />
         <CollectionPointMarkers points={routePoints} selectedPointId={pointId ?? undefined} onSelect={openPoint} />
