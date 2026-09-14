@@ -55,18 +55,25 @@ cidadão).
 
 ## 3. Configurar o provedor de mapas (opcional)
 
-Por padrão o mapa usa **tiles raster do OpenStreetMap**, sem exigir chave
-de API. Essa é uma escolha deliberada de robustez: um estilo vetorial de
-terceiros (Mapbox, OpenFreeMap etc.) depende de várias requisições
-encadeadas (style.json + sprites + glyphs + dezenas de tiles `.pbf`) — se
-qualquer uma falhar numa rede restrita (Wi-Fi de evento, proxy
-corporativo), o mapa inteiro não aparece. Tiles raster são simples
-requisições de imagem servidas por um dos hosts mais universalmente
-acessíveis que existem, o que torna o protótipo muito mais resistente no
-dia da apresentação. Se os tiles não carregarem mesmo assim, a interface
-mostra um aviso com botão "Tentar novamente" em vez de ficar em branco
-silenciosamente — controles, marcadores e rota continuam funcionando por
-cima do mapa mesmo sem os tiles visuais.
+Por padrão o mapa usa **tiles raster da CARTO** (`basemaps.cartocdn.com`),
+sem exigir chave de API. Dois motivos para essa escolha:
+
+- MapLibre GL renderiza tiles como texturas WebGL, o que exige que o
+  servidor responda com cabeçalhos CORS. Os tiles "clássicos" do
+  OpenStreetMap (`tile.openstreetmap.org`), pensados para uso com `<img>`
+  em bibliotecas como Leaflet, **não** enviam esses cabeçalhos de forma
+  confiável — usá-los resulta em mapa em branco mesmo com internet
+  funcionando normalmente. Os tiles da CARTO são publicados
+  explicitamente para uso embarcado em bibliotecas como esta.
+- São tiles raster simples (só requisições de imagem), em vez de um
+  estilo vetorial completo (style.json + sprites + glyphs + tiles
+  `.pbf`), o que reduz os pontos de falha numa rede mais restrita (Wi-Fi
+  de evento, proxy corporativo).
+
+Se os tiles não carregarem mesmo assim, a interface mostra um aviso com
+botão "Tentar novamente" em vez de ficar em branco silenciosamente —
+controles, marcadores e rota continuam funcionando por cima do mapa mesmo
+sem os tiles visuais.
 
 Para usar um estilo vetorial mais bonito (Mapbox, MapTiler, Google Maps
 Platform via um estilo compatível, um estilo próprio), crie um arquivo
